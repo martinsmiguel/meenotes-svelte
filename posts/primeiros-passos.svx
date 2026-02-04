@@ -1,0 +1,87 @@
+---
+title: 'Os Primeiros Passos do Blog com SvelteKit'
+date: '2024-05-21'
+tags: ['sveltekit', 'ssg', 'mdsvex', 'javascript', 'desenvolvimento-web']
+summary: 'Um guia prático sobre a construção de um blog estático do zero com SvelteKit. Documenta as decisões de pilha, os desafios de configuração de SSG e a implementação de rotas para listar e exibir posts em Markdown.'
+---
+
+Este post documenta a jornada prática de construção deste blog desde o zero. O objetivo era claro: criar um site estático, ultra-rápido e com foco total em conteúdo, usando a pilha de tecnologia mais moderna e adequada para essa tarefa.
+
+## Parte 1: A Escolha da Pilha de Tecnologia
+
+A jornada não começou do vácuo. O ponto de partida foi o excelente template **[Tailwind Nextjs Starter Blog](https://github.com/timlrx/tailwind-nextjs-starter-blog)**. É uma solução robusta, rica em recursos e uma demonstração impressionante do que é possível fazer com o ecossistema Next.js.
+
+No entanto, ao analisá-lo para um projeto pessoal, surgiu uma nova direção. A ideia de construir uma versão própria, do zero, foi motivada por uma busca por **controle total e simplicidade radical**. O template, embora fantástico, continha muitas camadas de abstração, bibliotecas e funcionalidades que eu não utilizaria. O desejo era entender cada linha de código e ter um sistema 100% alinhado com minhas necessidades, sem "bloat" (inchaço) ou caixas-pretas.
+
+Essa busca por um sistema mais enxuto me levou a reavaliar as opções de pilha:
+
+- **Next.js**: A inspiração inicial. Comprovadamente poderoso, mas o ecossistema e as abstrações podem ser excessivos para um blog minimalista.
+- **Astro**: Uma forte candidata, focada em performance e em gerar HTML puro. Sua filosofia de "zero JS por padrão" é muito atraente para um blog.
+- **SvelteKit**: A escolha final. A decisão se baseou em dois fatores técnicos que se alinhavam perfeitamente com a visão de um sistema enxuto e controlado:
+    1.  **Performance por Compilação**: SvelteKit é um compilador, não um runtime. Ele gera JavaScript vanilla otimizado no momento do build, resultando em um bundle final menor e mais rápido que o de qualquer alternativa baseada em runtime.
+    2.  **Integração Nativa com Markdown via `mdsvex`**: O `mdsvex` permite escrever componentes Svelte diretamente em arquivos Markdown (`.svx`). Isso transforma um post de um documento estático para um componente potencialmente interativo, uma vantagem única para a criação de conteúdo rico e "vivo".
+
+A decisão pelo SvelteKit foi, portanto, uma consequência direta do desejo de construir algo mais simples e mais próximo do metal, partindo da inspiração que o mundo Next.js proporcionou.
+
+## Parte 2: Construindo o Motor - Desafios e Soluções
+
+Com a pilha definida, a implementação começou. O processo não foi linear, e cada erro foi uma lição valiosa sobre a arquitetura do SvelteKit.
+
+### Desafio 1: Habilitando a Geração de Site Estático (SSG)
+
+O primeiro passo foi configurar o SvelteKit para gerar arquivos estáticos, necessários para o GitHub Pages. Isso foi feito com o adaptador `@sveltejs/adapter-static`.
+
+No entanto, o primeiro `npm run build` resultou em erro:
+
+```
+Error: Encountered dynamic routes
+- src/routes/
+```
+
+**Análise e Solução**: O adaptador estático, por segurança, exige que todas as rotas sejam explicitamente declaradas como pré-renderizáveis. A solução foi adicionar uma única linha ao nosso layout principal:
+
+```typescript
+// src/routes/+layout.ts
+export const prerender = true;
+```
+
+Isso instruiu o SvelteKit a tratar todo o site como estático, resolvendo o erro e gerando a pasta `build` corretamente.
+
+### Desafio 2: Lendo Posts no Servidor vs. Cliente
+
+Com o SSG funcionando, o próximo passo era ler os arquivos `.svx` da pasta `posts` e exibi-los na página inicial. A primeira tentativa foi criar uma `load` function diretamente em `src/routes/+page.svelte` usando os módulos `fs` e `glob` do Node.js.
+
+**Resultado**: Uma tela em branco no navegador.
+
+**Análise e Solução**: Este é um conceito fundamental do SvelteKit. Código que depende de APIs do Node.js (como `fs`) **não pode ser executado no navegador**. Durante o desenvolvimento, o SvelteKit tenta executar a `load` function tanto no servidor quanto no cliente, e a tentativa de usar `fs` no cliente falha.
+
+A solução é a convenção de arquivos `.server.ts`. Movemos toda a lógica de leitura de arquivos para `src/routes/+page.server.ts`:
+
+```typescript
+// src/routes/+page.server.ts
+import { glob } from 'glob';
+import { readFileSync } from 'fs';
+// ... lógica para ler e processar os arquivos .svx
+
+export async function load() {
+  // Lógica que roda APENAS no servidor
+  return { posts: [...] };
+}
+```
+
+Agora, o componente `src/routes/+page.svelte` se tornou um "presentational component", recebendo os dados já processados e se preocupando apenas com a renderização.
+
+### Desafio 3: Criando a Página Individual do Post
+
+O último passo foi implementar a rota dinâmica para cada post. A estrutura de pastas `src/routes/posts/[slug]/` foi criada.
+
+- **`+page.server.ts`**: A `load` function aqui recebe um objeto `params` da URL. Usamos `params.slug` para identificar qual post carregar, ler o arquivo `.svx` correspondente e retornar seus metadados e conteúdo.
+- **`+page.svelte`**: Este componente recebe os dados do post e usa a diretiva `{@html data.content}` para renderizar o HTML que foi processado pelo `mdsvex` no servidor.
+
+O fluxo final é: URL -> Servidor lê o arquivo -> `mdsvex` processa -> Dados são enviados para o componente -> HTML é renderizado no cliente.
+
+## Conclusão e Próximos Passos
+
+Ao final desta jornada, temos um blog local funcional, com uma arquitetura limpa e separada entre responsabilidades. Cada desafio superado solidificou o entendimento sobre as convenções e o poder do SvelteKit para a criação de sites estáticos.
+
+O próximo passo lógico é fechar o ciclo de desenvolvimento: automatizar o processo de `build` e `deploy` usando o GitHub Actions, transformando cada `git push` em uma nova publicação.

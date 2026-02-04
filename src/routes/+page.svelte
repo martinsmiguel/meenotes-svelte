@@ -19,7 +19,7 @@
       <ul>
         {#each data.posts as post (post.slug)}
           <li>
-            <a href="/posts/{post.slug}">
+            <a href="posts/{post.slug}">
               <h3>{post.title}</h3>
               <p>{post.summary}</p>
               <small>{post.date}</small>

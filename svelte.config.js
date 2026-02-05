@@ -2,12 +2,13 @@ import { mdsvex } from 'mdsvex';
 import adapter from '@sveltejs/adapter-static';
 import { glob } from 'glob';
 
-// Encontra todos os posts para pré-renderizar
 const postFiles = glob.sync('posts/*.svx');
 const postEntries = postFiles.map(file => {
 	const slug = file.split('/').pop()?.replace('.svx', '');
 	return `/posts/${slug}`;
 });
+
+console.log('Prerendering entries:', ['/', ...postEntries]);
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -22,7 +23,6 @@ const config = {
             precompress: false,
             strict: true
         }),
-		// Lista de páginas para pré-renderizar
 		prerender: {
 			entries: ['/', ...postEntries]
 		}
